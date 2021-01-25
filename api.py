@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
+# https://pastebin.com/WpDpDfeX
 import abc
 import json
 import datetime
@@ -9,8 +9,8 @@ import hashlib
 import uuid
 import re
 from optparse import OptionParser
-from weakref import WeakKeyDictionary
 from http.server import HTTPServer, BaseHTTPRequestHandler
+
 import scoring
 
 SALT = "Otus"
@@ -39,199 +39,159 @@ GENDERS = {
 }
 
 
-class CharField(object):
-    def __init__(self, required, nullable, **kwargs):
-        self.required = required
+class Field(object):
+    def __init__(self, nullable=False, required=False):
         self.nullable = nullable
-        self.type = str
-        self.data = WeakKeyDictionary()
-
-    def __get__(self, instance, cls):
-        return self.data.get(instance)
-
-    def __set__(self, instance, value):
-        if self.required and not self.nullable and not value:
-            raise Exception("The field is required")
-        else:
-            if not isinstance(value, self.type):
-                raise TypeError("Must be a ", self.type)
-            if not self.nullable and not value:
-                raise Exception("Value can't be null")
-            else:
-                self.data[instance] = value
-
-
-class ArgumentsField(object):
-    def __init__(self, required, nullable):
         self.required = required
-        self.nullable = nullable
-        self.arguments = WeakKeyDictionary()
-        self.type = dict
 
-    def __get__(self, instance, cls):
-        return self.arguments.get(instance)
+    def parse_validate(self, value):
+        return value
 
-    def __set__(self, instance, value):
-        if self.required and not self.nullable and not value:
-            raise Exception("The field is required", str.split(str(self.__class__), ".")[1][:-2])
-        elif value:
-            if not isinstance(value, self.type):
-                raise TypeError("Must be a ", self.type, "in", str.split(str(self.__class__), ".")[1][:-2])
-            if not self.nullable and not value:
-                raise Exception("Value can't be null", str.split(str(self.__class__), ".")[1][:-2])
-            else:
-                self.arguments[instance] = value
+
+class CharField(Field):
+    def parse_validate(self, value):
+        if isinstance(value, str):
+            return value
+        raise ValueError("value is not a string")
+
+
+class ArgumentsField(Field):
+    def parse_validate(self, value):
+        if isinstance(value, dict):
+            return value
+        raise ValueError("value is not a dictionary")
 
 
 class EmailField(CharField):
-    def __init__(self, **kwargs):
-        self.email_format = r"([-a-zA-Z0-9.`?{}_]+@\w+\.\w+)"
-        super().__init__(**kwargs)
-
-    def __set__(self, instance, value):
-        super().__set__(instance, value)
-        matched = re.match(self.email_format, value)
-        if value:
-            if matched:
-                self.data[instance] = value
-            else:
-                raise ValueError("Wrong email format", str.split(str(self.__class__), ".")[1][:-2])
+    def parse_validate(self, value):
+        value = super().parse_validate(value)
+        if "@" in value:
+            return value
+        raise ValueError("value is not an email")
 
 
-class PhoneField(object):
-    def __init__(self, required, nullable):
-        self.required = required
-        self.nullable = nullable
-        self.number = WeakKeyDictionary()
-
-    def __get__(self, instance, cls):
-        return self.number.get(instance)
-
-    def __set__(self, instance, value):
-        if self.required and not self.nullable and not value:
-            raise Exception("The field is required", str.split(str(self.__class__), ".")[1][:-2])
-        else:
-            if not self.nullable and not value:
-                raise Exception("Value can't be null", str.split(str(self.__class__), ".")[1][:-2])
-            elif value:
-                pattern = r'^7[0-9]*'
-                if re.match(pattern, str(value)) and (len(str(value)) == 11):
-                    self.number[instance] = str(value)
-                else:
-                    raise ValueError("Value must start with 7 and equal 11 digits",
-                                 str.split(str(self.__class__), ".")[1][:-2])
+class PhoneField(Field):
+    def parse_validate(self, value):  # code here
+        pattern = r'^7[0-9]*'
+        if isinstance(value, str) or isinstance(value, int):
+            if re.match(pattern, str(value)) and (len(str(value)) == 11):
+                return value
+            raise ValueError("Value is not a phone number. Must start with 7 and equal 11 digits")
 
 
-class DateField(object):
-    def __init__(self, required, nullable):
-        self.required = required
-        self.nullable = nullable
-        self.bd = WeakKeyDictionary()
-        self.type = str
-
-    def __get__(self, instance, cls):
-        return self.bd.get(instance)
-
-    def __set__(self, instance, value):
-        if self.required and not self.nullable and not value:
-            raise Exception("The field is required", str.split(str(self.__class__), ".")[1][:-2])
-        else:
-            if not isinstance(value, self.type):
-                raise TypeError("Must be a ", self.type)
-            if not value and not self.nullable:
-                raise Exception("This is the incorrect date string format. It should be DD.MM.YYYY",
-                            str.split(str(self.__class__), ".")[1][:-2])
-            elif value:
-                _format = "%d.%m.%Y"
-                value = datetime.datetime.strptime(value, _format)
-                self.bd[instance] = value
-
-
-class BirthDayField(object):
-    def __init__(self, required, nullable):
-        self.required = required
-        self.nullable = nullable
-        self.bd = WeakKeyDictionary()
-        self.type = str
-
-    def __get__(self, instance, cls):
-        return self.bd.get(instance)
-
-    def __set__(self, instance, value):
-        if self.required and not self.nullable and not value:
-            raise Exception("The field is required", str.split(str(self.__class__), ".")[1][:-2])
-        else:
+class DateField(Field):
+    def parse_validate(self, value):  # code here
+        if isinstance(value, str):
             _format = "%d.%m.%Y"
-            if not isinstance(value, self.type):
-                raise TypeError("Must be a ", self.type)
-            if not value and not self.nullable:
-                raise Exception("This is the incorrect date string format."
-                            " It should be DD.MM.YYYY", str.split(str(self.__class__), ".")[1][:-2])
-            elif value:
-                value = datetime.datetime.strptime(value, _format)
-                older_man = value.year + 70
-                today_year = datetime.datetime.today().year
-                if older_man < today_year:
-                    raise ValueError("You are so old. Your age must be less than 70 ",
+            value = datetime.datetime.strptime(value, _format)
+            return value
+        raise ValueError("This is the incorrect date string format. It should be DD.MM.YYYY")
+
+
+class BirthDayField(DateField):
+    def parse_validate(self, value):  # code here
+        _format = "%d.%m.%Y"
+        if isinstance(value, str):
+            value = datetime.datetime.strptime(value, _format)
+            older_man = value.year + 70
+            today_year = datetime.datetime.today().year
+            if older_man < today_year:
+                raise ValueError("You are so old. Your age must be less than 70 ",
                                  str.split(str(self.__class__), ".")[1][:-2])
-                self.bd[instance] = value
+            return value
+        raise ValueError("This is the incorrect date string format."
+                         " It should be DD.MM.YYYY")
 
 
-class GenderField(object):
-    def __init__(self, required, nullable):
-        self.required = required
-        self.nullable = nullable
-        self.gen = WeakKeyDictionary()
-        self.type = int
+class GenderField(Field):
+    def parse_validate(self, value):  # code here
         self.gen_list = [0, 1, 2]
-
-    def __get__(self, instance, cls):
-        return self.gen.get(instance)
-
-    def __set__(self, instance, value):
-        if self.required and not self.nullable and not value:
-            raise Exception("The field is required", str.split(str(self.__class__), ".")[1][:-2])
-        else:
-            if not self.nullable and not value in self.gen_list:
-                raise Exception("Value can't be null", str.split(str(self.__class__), ".")[1][:-2])
-            elif value in self.gen_list:
-                if not isinstance(value, self.type):
-                    raise TypeError("Must be a ", self.type, " or Value of gender must be 0, 1 or 2")
-                self.gen[instance] = value
-            else:
-                raise ValueError("Value must be in " + self.gen_list + " -- " + str.split(str(self.__class__), ".")[1][:-2])
+        if isinstance(value, int) and value in self.gen_list:
+            return str(value)
+        raise ValueError(
+            "Value must be in " + str(self.gen_list))
 
 
-class ClientIDsField(object):
-    def __init__(self, required):
-        self.required = required
-        self.interests = WeakKeyDictionary()
-        self.type = list
-        self.type_item = int
-
-    def __get__(self, instance, cls):
-        return self.interests.get(instance)
-
-    def __set__(self, instance, value):
-        if self.required and not value:
-            raise Exception("The field is required", str.split(str(self.__class__), ".")[1][:-2])
-        else:
-            if not isinstance(value, self.type):
-                raise TypeError("Must be a ", self.type)
-            else:
-                for item in value:
-                    if not isinstance(item, self.type_item):
-                        raise TypeError("List item must be a ", self.type_item, "in",
-                                        str.split(str(self.__class__), ".")[1][:-2])
-                self.interests[instance] = value
+class ClientIDsField(Field):
+    def parse_validate(self, value):
+        if isinstance(value, list):
+            for item in value:
+                if isinstance(item, int):
+                    return value
+                raise ValueError("List item must be an int")
+        raise ValueError("Field must be a list type. ")
 
 
-class ClientsInterestsRequest(object):
+class RequestHandler(object):
+    def validate_handle(self, request, arguments, ctx, store):
+        if not arguments.is_valid():
+            return arguments.errfmt(), INVALID_REQUEST
+        return self.handle(request, arguments, ctx, store)
+
+    def handle(self, request, arguments, ctx):
+        return {}, OK
+
+
+class RequestMeta(type):
+    def __new__(mcs, name, bases, attrs):
+        field_list = []
+        for k, v in attrs.items():
+            if isinstance(v, Field):
+                v.name = k
+                field_list.append(v)
+        cls = super().__new__(mcs, name, bases, attrs)
+        cls.fields = field_list
+        return cls
+
+
+class Request(object, metaclass=RequestMeta):
+    def __init__(self, request):
+        self.errors = []
+        self.request = request
+        self.is_cleaned = False
+
+    def clean(self):
+        for f in self.fields:  # code here
+            try:
+                name = f.name
+                req = f.required
+                has_name = name in self.request
+                if req and has_name:
+                    if not self.request[name] and not f.nullable:
+                        self.errors.append("Error in " + str(name) + ". Required field must be non-nullable ")
+                elif req and not has_name:
+                    self.errors.append("Error in " + str(name) + ". This is Required field.")
+                if has_name:
+                    parse = f.parse_validate(self.request[name])
+                    setattr(self, name, parse)
+                else:
+                    setattr(self, name, "")
+            except ValueError as e:
+                self.errors.append("Error in validate field: " + str(name) + ". " + str(e))
+
+    def is_valid(self):
+        if not self.is_cleaned:
+            self.clean()
+        return not self.errors
+
+    def errfmt(self):
+        return ", ".join(self.errors)
+
+
+class ClientsInterestsRequest(Request):
     client_ids = ClientIDsField(required=True)
     date = DateField(required=False, nullable=True)
 
 
-class OnlineScoreRequest(object):
+class ClientsInterestsHandler(RequestHandler):
+    request_type = ClientsInterestsRequest
+
+    def handle(self, request, arguments, ctx, store):
+        ctx["nclients"] = len(arguments.client_ids)
+        return {cid: scoring.get_interests(store, cid) for cid in arguments.client_ids}, OK
+
+
+class OnlineScoreRequest(Request):
     first_name = CharField(required=False, nullable=True)
     last_name = CharField(required=False, nullable=True)
     email = EmailField(required=False, nullable=True)
@@ -239,12 +199,43 @@ class OnlineScoreRequest(object):
     birthday = BirthDayField(required=False, nullable=True)
     gender = GenderField(required=False, nullable=True)
 
+    def is_valid(self):
+        default_valid = super().is_valid()
+        if not default_valid:
+            return default_valid
+        # code here
+        if (self.first_name and self.last_name) or (self.phone and self.email) or (self.gender and self.birthday):
+            return not self.errfmt()
+        else:
+            self.errors.append("Error in validate field")
+        return not self.errfmt()
 
-class MethodRequest(object):
+
+
+
+class OnlineScoreHandler(RequestHandler):
+    request_type = OnlineScoreRequest
+    def handle(self, request, arguments, ctx, store):
+        score = scoring.get_score(store,
+                                  arguments.phone, arguments.email,
+                                  arguments.birthday, arguments.gender,
+                                  arguments.first_name, arguments.last_name)
+        arg = []
+        if request.login == ADMIN_LOGIN:
+            return {"score": 42}, OK
+        for f in self.request_type.fields:
+            if getattr(arguments, f.name):
+                arg.append(f.name)
+        ctx["has"] = arg
+
+        return {"score": score}, OK
+
+
+class MethodRequest(Request):
     account = CharField(required=False, nullable=True)
     login = CharField(required=True, nullable=True)
     token = CharField(required=True, nullable=True)
-    arguments = ArgumentsField(required=False, nullable=True)
+    arguments = ArgumentsField(required=True, nullable=True)
     method = CharField(required=True, nullable=False)
 
     @property
@@ -264,76 +255,22 @@ def check_auth(request):
 
 
 def method_handler(request, ctx, store):
-    res = {}
-    lst = []
-    phone = email = fn = ln = bd = gen = date = ""
-    client_ids = []
-    response, code = None, None
-    meth = MethodRequest()
-    score = OnlineScoreRequest()
-    interests = ClientsInterestsRequest()
-    try:
-        meth.login = request['body']['login']
-        meth.account = request['body']['account']
-        meth.token = request['body']['token']
-        meth.arguments = request['body']['arguments']
-        meth.method = request['body']['method']
-        b = check_auth(meth)
-        if not b:
-            return {"code": 403, "error": "Forbidden"}, FORBIDDEN, lst
-        if meth.method == "online_score":
-            dict_arg = meth.arguments
-            score.email = dict_arg['email'] if 'email' in dict_arg.keys() else ""
-            score.phone = dict_arg['phone'] if 'phone' in dict_arg.keys() else ""
-            score.last_name = dict_arg['last_name'] if 'last_name' in dict_arg.keys() else ""
-            score.first_name = dict_arg['first_name'] if 'first_name' in dict_arg.keys() else ""
-            score.gender = dict_arg['gender'] if 'gender' in dict_arg.keys() else 0
-            score.birthday = dict_arg['birthday'] if 'birthday' in dict_arg.keys() else ""
-        elif meth.method == "clients_interests":
-            dict_arg = meth.arguments
-            interests.client_ids = dict_arg['client_ids'] if 'client_ids' in dict_arg.keys() else []
-            interests.date = dict_arg['date'] if 'date' in dict_arg.keys() else ""
-        else:
-            raise Exception("No method found")
-        for k, v in dict_arg.items():
-            if k == 'phone' and v:
-                phone = v
-                lst.append(k)
-            elif k == 'email' and v:
-                email = v
-                lst.append(k)
-            elif k == 'first_name' and v:
-                fn = v
-                lst.append(k)
-            elif k == 'last_name' and v:
-                ln = v
-                lst.append(k)
-            elif k == 'birthday' and v:
-                bd = v
-                lst.append(k)
-            elif k == 'gender' and str(v):
-                gen = str(v)
-                lst.append(k)
-            elif k == 'client_ids' and v:
-                client_ids = v
-                lst = len(v)
-            elif k == 'date' and v:
-                date = v
-            else:
-                logging.error("You've not pair")
-        if (phone and email) or (fn and ln) or (gen and bd):
-            if meth.login == ADMIN_LOGIN:
-                res['score'] = 42.0
-            else:
-                res['score'] = scoring.get_score(store, phone, email, bd, gen, fn, ln)
-        elif client_ids:
-            for item in client_ids:
-                res["client_id" + str(item)] = scoring.get_interests(store, item)
-        else:
-            raise Exception("Invalid request: ", INVALID_REQUEST, lst)
-    except Exception as e:
-        return {"code": 422, "error": e}, INVALID_REQUEST, lst
-    return res, OK, lst
+    methods_map = {
+        "online_score": OnlineScoreHandler,
+        "clients_interests": ClientsInterestsHandler,
+    }
+    method_request = MethodRequest(request["body"])
+    if not method_request.is_valid():
+        return method_request.errfmt(), INVALID_REQUEST
+    if not check_auth(method_request):
+        return None, FORBIDDEN
+    handler_cls = methods_map.get(method_request.method)
+    if not handler_cls:
+        return "Method Not Found", NOT_FOUND
+    response, code = handler_cls().validate_handle(method_request,
+                                                   handler_cls.request_type(method_request.arguments),
+                                                   ctx, store)
+    return response, code
 
 
 class MainHTTPHandler(BaseHTTPRequestHandler):
@@ -360,8 +297,7 @@ class MainHTTPHandler(BaseHTTPRequestHandler):
             logging.info("%s: %s %s" % (self.path, data_string, context["request_id"]))
             if path in self.router:
                 try:
-                    response, code, context['has'] = self.router[path]({"body": request, "headers": self.headers},
-                                                                       context, self.store)
+                    response, code = self.router[path]({"body": request, "headers": self.headers}, context, self.store)
                 except Exception as e:
                     logging.exception("Unexpected error: %s" % e)
                     code = INTERNAL_ERROR
@@ -374,13 +310,11 @@ class MainHTTPHandler(BaseHTTPRequestHandler):
         if code not in ERRORS:
             r = {"response": response, "code": code}
         else:
+            # @TODO: return errors as array
             r = {"error": response or ERRORS.get(code, "Unknown Error"), "code": code}
         context.update(r)
         logging.info(context)
-        self.wfile.write(b'```\n')
-        self.wfile.write(b'```\n')
         self.wfile.write(json.dumps(r).encode(encoding='utf_8'))
-        self.wfile.write(b'\n```')
         return
 
 
