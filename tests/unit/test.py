@@ -12,6 +12,7 @@ def cases(cases):
         def wrapper(*args):
             for c in cases:
                 new_args = args + (c if isinstance(c, tuple) else (c,))
+                print('Requests args {}'.format(new_args))
                 f(*new_args)
         return wrapper
     return decorator
@@ -19,29 +20,68 @@ def cases(cases):
 
 class TestSuite(unittest.TestCase):
 
-    def test_field(self):
+    @cases(["asd",
+            79175002040,
+            'asd@asd.ru',
+            ])
+    def test_field(self, param):
+        '''
+        Проверка поля родителя - Field
+        :return: Что ввели, то получили.
+        '''
         f = api.Field()
-        self.assertEqual(f.parse_validate('asd'), 'asd')
-        self.assertEqual(f.parse_validate(123), 123)
+        self.assertEqual(f.parse_validate(param), param)
 
-    def test_charfield(self):
+    @cases(["asd",
+            'asd@asd.ru',
+            '123!@#asdd'
+            ])
+    def test_charfield(self, param):
         f = api.CharField()
-        self.assertEqual(f.parse_validate('asd'), 'asd')
-        with self.assertRaises(ValueError):
-            f.parse_validate(123)
+        self.assertEqual(f.parse_validate(param), param)
 
-    def test_argumentfield(self):
+
+    @cases([-1,
+            1234,
+           1.2,
+            [1,2,3],
+            {'a': 123}])
+    def test_non_charfield(self, param):
+        f = api.CharField()
+        with self.assertRaises(ValueError):
+            f.parse_validate(param)
+
+    @cases([
+            {'a': 123}])
+    def test_argumentfield(self, param):
         f = api.ArgumentsField()
-        self.assertEqual(type(f.parse_validate({})), dict)
-        with self.assertRaises(ValueError):
-            f.parse_validate(123)
+        self.assertEqual(type(f.parse_validate(param)), dict)
 
-    def test_emailfield(self):
-        f = api.EmailField()
-        email = 'asd@asd.ru'
-        self.assertEqual(f.parse_validate(email), email)
+    @cases([-1,
+            1234,
+           1.2,
+            [1, 2, 3]
+            ])
+    def test_non_argumentfield(self, param):
+        f = api.ArgumentsField()
         with self.assertRaises(ValueError):
-            f.parse_validate(123)
+            f.parse_validate(param)
+
+    @cases(['asd@asd.ru',
+            '@'])
+    def test_emailfield(self, email):
+        f = api.EmailField()
+        self.assertEqual(f.parse_validate(email), email)
+
+    @cases([-1,
+            1234,
+           1.2,
+            [1, 2, 3]
+            ])
+    def test_non_emailfield(self, param):
+        f = api.EmailField()
+        with self.assertRaises(ValueError):
+            f.parse_validate(param)
 
     @cases(["79175002040",
             79175002040])
