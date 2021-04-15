@@ -1,3 +1,4 @@
+import time
 import unittest
 import store
 from time import sleep
@@ -47,7 +48,7 @@ class TestSuite(unittest.TestCase):
         :return: False
         '''
         sleep(3)
-        self.assertEqual(self.get_cache_get(), False)
+        self.assertEqual(self.get_cache_get(), None)
 
     def test_get(self):
         '''
@@ -55,7 +56,7 @@ class TestSuite(unittest.TestCase):
         :return: list(интересы)
         '''
         pattern = r'^\[[,"\w].*\]$'
-        getter = store.get('list:interests')
+        getter = store.get()
         leng = len(getter)
         match = re.match(pattern, getter)
         self.assertEqual(match.endpos, leng)
@@ -70,6 +71,15 @@ class TestSuite(unittest.TestCase):
             r.shutdown(nosave=True)
         r = store.conn_exist(db=0)
         self.assertEqual(r, False)
+
+    def test_reconnect_to_redis(self):
+        '''
+        Test reconnecting to redis after fall
+        :return:
+        '''
+        time.sleep(11)
+        r = store.conn_exist(db=0)
+        self.assertEqual(r, None)
 
 if __name__ == "__main__":
     unittest.main()

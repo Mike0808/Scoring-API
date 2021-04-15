@@ -12,8 +12,10 @@ def cases(cases):
         def wrapper(*args):
             for c in cases:
                 new_args = args + (c if isinstance(c, tuple) else (c,))
-                print('Requests args {}'.format(new_args))
-                f(*new_args)
+                try:
+                    f(*new_args)
+                except Exception as e:
+                    print('ERROR OCCURRED:Requests args {} -- with exception {}'.format(new_args, e))
         return wrapper
     return decorator
 

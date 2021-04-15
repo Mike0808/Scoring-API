@@ -12,13 +12,15 @@ def cases(cases):
         def wrapper(*args):
             for c in cases:
                 new_args = args + (c if isinstance(c, tuple) else (c,))
-                print('Requests args {}'.format(new_args))
-                f(*new_args)
+                try:
+                    f(*new_args)
+                except Exception as e:
+                    print('Requests args {} -- with exception {}'.format(new_args, e))
         return wrapper
     return decorator
 
 
-class TestSuite(unittest.TestCase):
+class TestField(unittest.TestCase):
 
     @cases(["asd",
             79175002040,
@@ -32,60 +34,67 @@ class TestSuite(unittest.TestCase):
         f = api.Field()
         self.assertEqual(f.parse_validate(param), param)
 
+
+class TestCharfield(unittest.TestCase):
     @cases(["asd",
             'asd@asd.ru',
             '123!@#asdd'
             ])
-    def test_charfield(self, param):
+    def test_char_field(self, param):
         f = api.CharField()
         self.assertEqual(f.parse_validate(param), param)
 
-
     @cases([-1,
             1234,
-           1.2,
-            [1,2,3],
+            1.2,
+            [1, 2, 3],
             {'a': 123}])
-    def test_non_charfield(self, param):
+    def test_non_char_field(self, param):
         f = api.CharField()
         with self.assertRaises(ValueError):
             f.parse_validate(param)
 
+
+class TestArgumentField(unittest.TestCase):
     @cases([
-            {'a': 123}])
-    def test_argumentfield(self, param):
+        {'a': 123}])
+    def test_argument_field(self, param):
         f = api.ArgumentsField()
         self.assertEqual(type(f.parse_validate(param)), dict)
 
     @cases([-1,
             1234,
-           1.2,
+            1.2,
             [1, 2, 3]
             ])
-    def test_non_argumentfield(self, param):
+    def test_non_argument_field(self, param):
         f = api.ArgumentsField()
         with self.assertRaises(ValueError):
             f.parse_validate(param)
 
+
+class TestEmailField(unittest.TestCase):
     @cases(['asd@asd.ru',
             '@'])
-    def test_emailfield(self, email):
+    def test_email_field(self, email):
         f = api.EmailField()
         self.assertEqual(f.parse_validate(email), email)
 
     @cases([-1,
             1234,
-           1.2,
+            1.2,
             [1, 2, 3]
             ])
-    def test_non_emailfield(self, param):
+    def test_non_email_field(self, param):
         f = api.EmailField()
         with self.assertRaises(ValueError):
             f.parse_validate(param)
 
+
+class TestPhoneField(unittest.TestCase):
     @cases(["79175002040",
             79175002040])
-    def test_phonefield(self, phone):
+    def test_phone_field(self, phone):
         f = api.PhoneField()
         self.assertEqual(f.parse_validate(phone), phone)
 
@@ -93,14 +102,16 @@ class TestSuite(unittest.TestCase):
             '89175002040',
             'asd',
             2312])
-    def test_non_phonefield(self, phone):
+    def test_non_phone_field(self, phone):
         f = api.PhoneField()
         with self.assertRaises(ValueError):
             f.parse_validate(phone)
 
+
+class TestDateField(unittest.TestCase):
     @cases(['27.02.2009',
-            '02.03.2019',])
-    def test_datefield(self, datefield):
+            '02.03.2019', ])
+    def test_date_field(self, datefield):
         f = api.DateField()
         dt = datetime.datetime.strptime(datefield, "%d.%m.%Y")
         self.assertEqual(f.parse_validate(datefield), dt)
@@ -110,11 +121,13 @@ class TestSuite(unittest.TestCase):
             '13/11/2020',
             122233,
             'asd'])
-    def test_not_datefield(self, datefield):
+    def test_not_date_field(self, datefield):
         f = api.DateField()
         with self.assertRaises(ValueError):
             f.parse_validate(datefield)
 
+
+class TestBirthday(unittest.TestCase):
     @cases(['27.02.2009',
             '02.06.2009'])
     def test_birthday(self, birthday):
@@ -131,6 +144,8 @@ class TestSuite(unittest.TestCase):
         with self.assertRaises(ValueError):
             f.parse_validate(birthday)
 
+
+class TestGenderField(unittest.TestCase):
     @cases([1,
             2,
             0])
@@ -147,6 +162,8 @@ class TestSuite(unittest.TestCase):
         with self.assertRaises(ValueError):
             f.parse_validate(gendernum)
 
+
+class TestClientId(unittest.TestCase):
     @cases([[1, 2, 3],
             [i for i in range(5)]
             ])
@@ -158,7 +175,7 @@ class TestSuite(unittest.TestCase):
 
     @cases([{1, 2, 3},
             [-1, 6],
-            [1.1,.2],
+            [1.1, .2],
             ])
     def test_non_clientid(self, clientid):
         f = api.ClientIDsField()
