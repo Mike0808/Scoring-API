@@ -116,9 +116,9 @@ class ClientIDsField(Field):
     def parse_validate(self, value):
         if isinstance(value, list):
             for item in value:
-                if isinstance(item, int):
+                if isinstance(item, int) and item >= 0:
                     return value
-                raise ValueError("List item must be an int")
+                raise ValueError("List item must be an int and ge 0")
         raise ValueError("Field must be a list type. ")
 
 
@@ -188,7 +188,7 @@ class ClientsInterestsHandler(RequestHandler):
 
     def handle(self, request, arguments, ctx, store):
         ctx["nclients"] = len(arguments.client_ids)
-        return {cid: scoring.get_interests(store, cid) for cid in arguments.client_ids}, OK
+        return {cid: scoring.get_interests(cid) for cid in arguments.client_ids}, OK
 
 
 class OnlineScoreRequest(Request):
@@ -216,7 +216,7 @@ class OnlineScoreRequest(Request):
 class OnlineScoreHandler(RequestHandler):
     request_type = OnlineScoreRequest
     def handle(self, request, arguments, ctx, store):
-        score = scoring.get_score(store,
+        score = scoring.get_score(
                                   arguments.phone, arguments.email,
                                   arguments.birthday, arguments.gender,
                                   arguments.first_name, arguments.last_name)
