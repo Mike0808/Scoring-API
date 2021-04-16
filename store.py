@@ -13,7 +13,7 @@ REDIS_AUTH = {
 }
 
 
-class RedisClient():
+class RedisClient:
     def __init__(self,
                  host=REDIS_AUTH['HOST'],
                  port=REDIS_AUTH['PORT'],
@@ -57,33 +57,27 @@ class RedisClient():
         self._conn = redis.StrictRedis(connection_pool=self.pool)
 
 
-
-def conn_exist(db):
-    redis_client = RedisClient(db=db)
+def conn_exist(redis_client):
     return redis_client.conn
 
 
-
-def cache_set(key, score, period):
+def cache_set(conn, key, score, period):
     i = 0
-    r = conn_exist(db=0)
-    if r:
-        rsetter = r.set(name=key, value=score, ex=period)
+    if conn:
+        rsetter = conn.set(name=key, value=score, ex=period)
     return rsetter
 
 
-def cache_get(key=None):
-    r = conn_exist(db=0)
-    if r:
-        if r.exists(key):
-            rgetter = float(r.get(key).decode('UTF-8'))
+def cache_get(conn, key=None):
+    if conn:
+        if conn.exists(key):
+            rgetter = float(conn.get(key).decode('UTF-8'))
             return rgetter
 
 
-def get(key):
-    r = conn_exist(db=1)
-    if r:
-        l = r.get('list:interests').decode('UTF-8').split(',')
+def get(conn, key):
+    if conn:
+        l = conn.get('list:interests').decode('UTF-8').split(',')
         res = '["' + '","'.join(random.sample(l, 2)) + '"]'
         return res
     else:

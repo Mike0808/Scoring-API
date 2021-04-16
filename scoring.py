@@ -2,6 +2,8 @@ import hashlib
 import json
 import store
 
+redis_client = store.RedisClient()
+
 
 def get_score(phone, email, birthday=None, gender=None, first_name=None, last_name=None):
     key_parts = [
@@ -13,7 +15,7 @@ def get_score(phone, email, birthday=None, gender=None, first_name=None, last_na
     key = "uid:" + hashlib.md5("".join(key_parts).encode('utf-8')).hexdigest()
     # try get from cache,
     # fallback to heavy calculation in case of cache miss
-    score = store.cache_get(key) or 0
+    score = store.cache_get(redis_client.conn, key) or 0
     if score:
         return score
     if phone:
@@ -25,10 +27,10 @@ def get_score(phone, email, birthday=None, gender=None, first_name=None, last_na
     if first_name and last_name:
         score += 0.5
     # cache for 60 minutes
-    store.cache_set(key, score, 60 * 60)
+    store.cache_set(redis_client.conn, key, score, 60 * 60)
     return score
 
 
 def get_interests(cid):
-    r = store.get("i:%s" % cid)
+    r = store.get(redis_client.conn, "i:%s" % cid)
     return json.loads(r) if r else []

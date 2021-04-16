@@ -1,28 +1,32 @@
+import re
 import time
 import unittest
-import store
 from time import sleep
-import redis
-import re
 
+import redis
+
+import store
+
+redis_client = store.RedisClient()
 
 class TestSuite(unittest.TestCase):
     def setUp(self):
         self.key = 'test_cache'
         self.score = 3.0
+        self.conn = redis_client
 
     def set_cache_set(self, timeout=3):
-        return store.cache_set(key=self.key, score=self.score, period=timeout)
+        return store.cache_set(self.conn.conn, key=self.key, score=self.score, period=timeout)
 
     def get_cache_get(self):
-        return store.cache_get(key=self.key)
+        return store.cache_get(self.conn.conn, key=self.key)
 
     def test_conn_exist(self):
         '''
         Проверка подключения к Redis
         '''
-        r = store.conn_exist(db=0)
-        self.assertEqual(type(r), redis.Redis)
+        # r = store.conn_exist(db=0)
+        self.assertEqual(type(self.conn.conn), redis.Redis)
 
     def test_cache_setter(self):
         '''
@@ -56,7 +60,7 @@ class TestSuite(unittest.TestCase):
         :return: list(интересы)
         '''
         pattern = r'^\[[,"\w].*\]$'
-        getter = store.get()
+        getter = store.get(self.conn.conn, 'list:interests')
         leng = len(getter)
         match = re.match(pattern, getter)
         self.assertEqual(match.endpos, leng)
@@ -66,20 +70,23 @@ class TestSuite(unittest.TestCase):
         Проверка недоступености Redis
         :return:
         '''
-        r = store.conn_exist(db=0)
-        if r:
-            r.shutdown(nosave=True)
-        r = store.conn_exist(db=0)
-        self.assertEqual(r, False)
+        try:
+            g = self.conn.pool.get_connection('_')
+            r = self.conn.conn
+            if g:
+                r.shutdown(nosave=True)
+            self.conn.pool.get_connection('_')
+        except redis.exceptions.ConnectionError as e:
+            return True
 
     def test_reconnect_to_redis(self):
         '''
         Test reconnecting to redis after fall
         :return:
         '''
-        time.sleep(11)
-        r = store.conn_exist(db=0)
-        self.assertEqual(r, None)
+        g = self.conn.conn
+        self.assertEqual(g, None)
+
 
 if __name__ == "__main__":
     unittest.main()
