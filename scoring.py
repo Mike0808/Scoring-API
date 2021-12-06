@@ -3,6 +3,7 @@ import json
 import store
 
 redis_client = store.RedisClient()
+pc = store.PersistConnection(redis_client)
 
 
 def get_score(phone, email, birthday=None, gender=None, first_name=None, last_name=None):
@@ -15,7 +16,8 @@ def get_score(phone, email, birthday=None, gender=None, first_name=None, last_na
     key = "uid:" + hashlib.md5("".join(key_parts).encode('utf-8')).hexdigest()
     # try get from cache,
     # fallback to heavy calculation in case of cache miss
-    score = store.cache_get(redis_client.conn, key) or 0
+    pc.key = key
+    score = pc.cache_get() or 0
     if score:
         return score
     if phone:
@@ -27,7 +29,9 @@ def get_score(phone, email, birthday=None, gender=None, first_name=None, last_na
     if first_name and last_name:
         score += 0.5
     # cache for 60 minutes
-    store.cache_set(redis_client.conn, key, score, 60 * 60)
+    pc.score = score
+    pc.period = 60 * 60
+    pc.cache_set()
     return score
 
 

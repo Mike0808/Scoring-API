@@ -8,18 +8,22 @@ import redis
 import store
 
 redis_client = store.RedisClient()
+pc = store.PersistConnection(redis_client)
 
 class TestSuite(unittest.TestCase):
     def setUp(self):
         self.key = 'test_cache'
         self.score = 3.0
         self.conn = redis_client
+        pc.key = self.key
+        pc.score = self.score
 
     def set_cache_set(self, timeout=3):
-        return store.cache_set(self.conn.conn, key=self.key, score=self.score, period=timeout)
+        pc.period = timeout
+        return pc.cache_set()
 
     def get_cache_get(self):
-        return store.cache_get(self.conn.conn, key=self.key)
+        return pc.cache_get()
 
     def test_conn_exist(self):
         '''
@@ -60,7 +64,8 @@ class TestSuite(unittest.TestCase):
         :return: list(интересы)
         '''
         pattern = r'^\[[,"\w].*\]$'
-        getter = store.get(self.conn.conn, 'list:interests')
+        pc.key = 'list:interests'
+        getter = pc.get()
         leng = len(getter)
         match = re.match(pattern, getter)
         self.assertEqual(match.endpos, leng)

@@ -40,7 +40,6 @@ class RedisClient:
     def conn(self):
         for reconnect in range(4):
             try:
-
                 if not hasattr(self, '_conn'):
                     self.get_connection()
                 else:
@@ -57,28 +56,33 @@ class RedisClient:
         self._conn = redis.StrictRedis(connection_pool=self.pool)
 
 
-def conn_exist(redis_client):
-    return redis_client.conn
+class PersistConnection:
 
+    def __init__(self, redis_client, score=None, period=None,  key=None):
+        self.redis_client = redis_client
+        self.conn = self.redis_client.conn
+        self.key = key
+        self.score = score
+        self.period = period
 
-def cache_set(conn, key, score, period):
-    i = 0
-    if conn:
-        rsetter = conn.set(name=key, value=score, ex=period)
-    return rsetter
+    def conn_exist(self, redis_client):
+        return redis_client.conn
 
+    def cache_set(self):
+        if self.conn:
+            rsetter = self.conn.set(name=self.key, value=self.score, ex=self.period)
+            return rsetter
+        return None
 
-def cache_get(conn, key=None):
-    if conn:
-        if conn.exists(key):
-            rgetter = float(conn.get(key).decode('UTF-8'))
-            return rgetter
+    def cache_get(self):
+        if self.conn:
+            if self.conn.exists(self.key):
+                rgetter = float(self.conn.get(self.key).decode('UTF-8'))
+                return rgetter
 
-
-def get(conn, key):
-    if conn:
-        l = conn.get('list:interests').decode('UTF-8').split(',')
-        res = '["' + '","'.join(random.sample(l, 2)) + '"]'
-        return res
-    else:
+    def get(self):
+        if self.conn:
+            l = self.conn.get('list:interests').decode('UTF-8').split(',')
+            res = '["' + '","'.join(random.sample(l, 2)) + '"]'
+            return res
         return False

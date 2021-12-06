@@ -1,0 +1,9 @@
+/api.py.bak
+/api2.py
+/app.log
+/dump.rdb
+/scoring.bak.py
+/venv/
+/venv/bin/*
+/venv/include/
+/venv/lib/**
